@@ -14,7 +14,7 @@ import (
 	"github.com/Mibokess/grapes/internal/tui"
 )
 
-var version = "0.1.9"
+var version = "0.1.10"
 
 func main() {
 	// Handle help/version, validate command arguments, and reject unknown
