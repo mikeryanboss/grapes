@@ -1,11 +1,9 @@
 package detail_test
 
 import (
-	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/Mibokess/grapes/internal/tmux"
 	"github.com/Mibokess/grapes/internal/tui/common"
 	"github.com/Mibokess/grapes/internal/tui/detail"
 	"github.com/Mibokess/grapes/internal/tui/testutil"
@@ -116,57 +114,6 @@ func TestDetail_KeyC_LaunchesComment(t *testing.T) {
 	_, cmd := m.Update(keyMsg("c"))
 	if _, ok := extractMsg(cmd).(common.LaunchEditorMsg); !ok {
 		t.Error("c should send LaunchEditorMsg")
-	}
-}
-
-func TestDetail_KeyA_StartsSession(t *testing.T) {
-	m := newDetailModel()
-	_, cmd := m.Update(keyMsg("a"))
-	start, ok := extractMsg(cmd).(common.StartTmuxMsg)
-	if !ok {
-		t.Fatal("a should send StartTmuxMsg")
-	}
-	if start.IssueID != 1 {
-		t.Errorf("expected issue ID 1, got %d", start.IssueID)
-	}
-}
-
-func TestDetail_SessionRows_DisplayOnlyMatchingIssue(t *testing.T) {
-	m := newDetailModel().SetTmuxSessions([]tmux.Session{
-		{IssueID: 1, Agent: "agent-one", Name: "grapes-one", Target: "grapes-one:0.0"},
-		{IssueID: 2, Agent: "agent-two", Name: "grapes-two", Target: "grapes-two:0.0"},
-	})
-	view := testutil.StripANSI(m.View())
-	if !strings.Contains(view, "agent-one") || !strings.Contains(view, "grapes-one:0.0") {
-		t.Fatal("matching tmux session should be displayed")
-	}
-	if strings.Contains(view, "agent-two") || strings.Contains(view, "grapes-two") {
-		t.Fatal("sessions for other issues should not be displayed")
-	}
-}
-
-func TestDetail_SessionRowClick_Attaches(t *testing.T) {
-	m := newDetailModel().SetTmuxSessions([]tmux.Session{
-		{IssueID: 1, Agent: "agent-one", Name: "grapes-one", Target: "grapes-one:0.0"},
-	})
-	lines := strings.Split(testutil.StripANSI(m.View()), "\n")
-	row := -1
-	for i, line := range lines {
-		if strings.Contains(line, "agent-one") {
-			row = i
-			break
-		}
-	}
-	if row < 0 {
-		t.Fatal("session row not found")
-	}
-	_, cmd := m.Update(tea.MouseClickMsg{X: 2, Y: row + 1, Button: tea.MouseLeft})
-	attach, ok := extractMsg(cmd).(common.AttachTmuxMsg)
-	if !ok {
-		t.Fatal("clicking a session row should send AttachTmuxMsg")
-	}
-	if attach.IssueID != 1 || attach.Target != "grapes-one:0.0" {
-		t.Fatalf("unexpected attach message: %+v", attach)
 	}
 }
 

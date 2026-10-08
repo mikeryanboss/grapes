@@ -1,0 +1,6 @@
+title = 'Remove the tmux feature and add an embedded package for hosting grapes in vineyard'
+status = 'done'
+priority = 'high'
+labels = ['tui', 'integration']
+created = 2026-10-08T22:03:00Z
+updated = 2026-10-08T22:10:00Z

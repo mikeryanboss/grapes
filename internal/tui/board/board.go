@@ -283,6 +283,10 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			if issue, ok := m.currentIssue(); ok {
 				return m, func() tea.Msg { return common.OpenDetailMsg{ID: issue.ID} }
 			}
+		case key.Matches(msg, common.GlobalKeyMap.Sessions):
+			if issue, ok := m.currentIssue(); ok {
+				return m, func() tea.Msg { return common.SessionsMsg{IssueID: issue.ID} }
+			}
 		case key.Matches(msg, common.BoardKeyMap.EditIssue):
 			if issue, ok := m.currentIssue(); ok {
 				return m, func() tea.Msg { return common.LaunchEditMsg{ID: issue.ID} }

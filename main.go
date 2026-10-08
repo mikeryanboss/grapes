@@ -14,7 +14,7 @@ import (
 	"github.com/Mibokess/grapes/internal/tui"
 )
 
-var version = "0.1.10"
+var version = "0.1.11"
 
 func main() {
 	// Handle help/version, validate command arguments, and reject unknown
@@ -86,29 +86,10 @@ func main() {
 		}
 	}
 
-	cfg, cfgErr := config.Load(issuesDir)
-	// The loader is handed to the TUI rather than rebuilt per reload: it caches
-	// what each worktree has changed, keyed on that worktree's HEAD.
-	loader := data.NewWorkspaceLoader()
-	ws, err := loader.Load(issuesDir, data.WorkspaceOptions{
-		DefaultBranch: cfg.Sources.DefaultBranch,
-		ExtraDirs:     cfg.Sources.Dirs,
-	})
+	model, err := tui.Load(issuesDir, version)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error loading issues: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Error %v\n", err)
 		os.Exit(1)
-	}
-	problems := ws.Problems
-	model := tui.NewModel(ws, loader, issuesDir, cfg, version)
-	// The TUI owns the screen from here, so a stderr warning would be wiped by
-	// the alt-screen switch. Surface startup problems in the status bar instead.
-	switch {
-	case cfgErr != nil:
-		model = model.WithStatus("Config error (using defaults): " + cfgErr.Error())
-	case len(problems) == 1:
-		model = model.WithStatus("Skipped " + problems[0].Error())
-	case len(problems) > 1:
-		model = model.WithStatus(fmt.Sprintf("Skipped %s (+%d more)", problems[0].Error(), len(problems)-1))
 	}
 	if err := runTUI(model); err != nil {
 		writeProgramError(os.Stderr, err)
