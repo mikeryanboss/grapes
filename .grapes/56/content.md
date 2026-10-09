@@ -1,6 +1,6 @@
 ## Goal
 
-Let a host program read an issue's labels, parent, children, and blockers through `embedded.Issue`, so vineyard can write an agent's first prompt from them (vineyard issue #28).
+Let a host program read an issue's labels, parent, children, and blockers through `embedded.Issue`, so vineyard can write an agent's first prompt from them (vineyard issue #29).
 
 ## Description
 
