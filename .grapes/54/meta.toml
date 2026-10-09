@@ -1,0 +1,6 @@
+title = 'Release 0.1.12 so vineyard can pin RenderIssue'
+status = 'done'
+priority = 'medium'
+labels = ['release']
+created = 2026-10-09T09:18:00Z
+updated = 2026-10-09T09:18:00Z
