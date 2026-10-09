@@ -1,0 +1,6 @@
+title = 'Expose labels and relations of an issue to an embedding host'
+status = 'done'
+priority = 'high'
+labels = ['embedded', 'vineyard']
+created = 2026-10-09T19:20:00Z
+updated = 2026-10-09T19:38:00Z

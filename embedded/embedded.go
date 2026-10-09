@@ -14,6 +14,7 @@ package embedded
 import (
 	"path/filepath"
 	"runtime/debug"
+	"slices"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
@@ -39,6 +40,13 @@ type Issue struct {
 	ID     int
 	Title  string
 	Status string
+	Labels []string
+	// Parent is the ID of the issue's parent, or 0 for a top-level issue.
+	Parent int
+	// Children are the IDs of the issues whose parent it is, ascending.
+	Children []int
+	// BlockedBy are the IDs of the issues it waits for.
+	BlockedBy []int
 }
 
 // New loads the issues in issuesDir, a .grapes directory, together with the
@@ -88,11 +96,23 @@ func (m Model) OpenIssue(id int) (Model, tea.Cmd) {
 	return m.Update(common.OpenDetailMsg{ID: id})
 }
 
-// Issue returns issue id, as Grapes currently shows it.
+// Issue returns a copy of issue id, as Grapes currently shows it.
 func (m Model) Issue(id int) (Issue, bool) {
 	for _, iss := range m.tui.Issues() {
 		if iss.ID == id {
-			return Issue{ID: iss.ID, Title: iss.Title, Status: string(iss.Status)}, true
+			parent := 0
+			if iss.Parent != nil {
+				parent = *iss.Parent
+			}
+			return Issue{
+				ID:        iss.ID,
+				Title:     iss.Title,
+				Status:    string(iss.Status),
+				Labels:    slices.Clone(iss.Labels),
+				Parent:    parent,
+				Children:  slices.Clone(iss.Children),
+				BlockedBy: slices.Clone(iss.BlockedBy),
+			}, true
 		}
 	}
 	return Issue{}, false
