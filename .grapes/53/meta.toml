@@ -1,0 +1,6 @@
+title = 'Let an embedding host render one issue at its own width'
+status = 'done'
+priority = 'medium'
+labels = ['tui', 'integration']
+created = 2026-10-09T08:56:00Z
+updated = 2026-10-09T08:57:00Z

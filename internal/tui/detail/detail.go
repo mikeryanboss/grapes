@@ -200,6 +200,12 @@ func (m Model) View() string {
 	return m.viewport.View()
 }
 
+// Render renders issue as the detail screen shows it, width cells wide.
+func Render(issue data.Issue, allIssues []data.Issue, width int, theme common.Theme, wtNames []string) string {
+	content, _, _ := renderIssue(issue, allIssues, width, theme, wtNames)
+	return content
+}
+
 func renderIssue(issue data.Issue, allIssues []data.Issue, width int, theme common.Theme, wtNames []string) (string, map[int]int, []clickZone) {
 	clickLines := make(map[int]int)
 	var zones []clickZone

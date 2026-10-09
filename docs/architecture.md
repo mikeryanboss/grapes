@@ -165,6 +165,11 @@ An embedded model changes three things:
   only sessions Grapes knows about; standalone, the root model ignores the message.
 - The status bar offers `a sessions` and `q back` instead of `q quit`.
 
+A host also reads issues without showing the screen. `RenderIssue` returns an
+issue as the detail screen draws it, at a width the host chooses, for a pane of the
+host's own. Given a worktree path, it shows that worktree's copy of the issue, so a
+host showing an agent's session shows the issue as that agent left it.
+
 Commands from an embedded model run in the host program, so their messages, including
 the file watcher's and the periodic reload's, arrive in the host's `Update`. The host
 must forward every message it does not handle, even while Grapes is hidden.

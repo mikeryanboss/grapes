@@ -111,3 +111,18 @@ func (m Model) TouchedIssues(worktreePath string) []int {
 	}
 	return nil
 }
+
+// RenderIssue renders issue id as Grapes' detail screen shows it, width cells
+// wide, without the screen's header, status bar, or scrolling. When the
+// worktree at worktreePath changed the issue, it shows that worktree's copy;
+// otherwise the copy Grapes shows. An unknown id has nothing to render.
+func (m Model) RenderIssue(id int, worktreePath string, width int) (string, bool) {
+	path := filepath.Clean(worktreePath)
+	name := ""
+	for _, wt := range m.tui.Worktrees() {
+		if filepath.Clean(wt.Path) == path {
+			name = wt.Name
+		}
+	}
+	return m.tui.RenderIssue(id, name, width)
+}

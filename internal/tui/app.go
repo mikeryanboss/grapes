@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -327,6 +328,22 @@ func (m Model) Issues() []data.Issue { return m.issues }
 
 // Worktrees returns the worktrees whose branches changed at least one issue.
 func (m Model) Worktrees() []data.WorktreeInfo { return m.worktrees }
+
+// RenderIssue renders issue id as the detail screen shows it, width cells
+// wide, showing the copy in worktree, a worktree name, when it has one. With
+// worktree "", or without a copy there, it shows the active copy.
+func (m Model) RenderIssue(id int, worktree string, width int) (string, bool) {
+	i := slices.IndexFunc(m.issues, func(iss data.Issue) bool { return iss.ID == id })
+	if i < 0 {
+		return "", false
+	}
+	iss := m.issues[i]
+	src := slices.IndexFunc(iss.Sources, func(s data.IssueSource) bool { return s.Name == worktree })
+	if worktree != "" && src >= 0 {
+		iss.SwitchSource(src)
+	}
+	return detail.Render(iss, m.issues, width, m.theme, m.worktreeNames), true
+}
 
 // Load reads the configuration and every issue source for issuesDir and
 // returns the model. Startup problems that do not stop Grapes, a broken config
