@@ -9,8 +9,8 @@ import (
 type GlobalKeys struct {
 	Quit     key.Binding
 	Settings key.Binding
-	// Sessions asks the host program for the agent sessions working on the
-	// selected issue. It does something only when Grapes is embedded.
+	// Sessions asks for the agent sessions working on the selected issue: the
+	// host program when Grapes is embedded, vineyard when it is installed.
 	Sessions key.Binding
 }
 

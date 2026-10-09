@@ -161,9 +161,18 @@ An embedded model changes three things:
 - The quit key emits `common.CloseMsg` instead of `tea.Quit`, which would end the
   host. The file watcher keeps running, because the host may show Grapes again.
 - The sessions key (`a`) on the board, list, and detail screens emits
-  `common.SessionsMsg` with the selected issue's ID. A host's agent sessions are the
-  only sessions Grapes knows about; standalone, the root model ignores the message.
+  `common.SessionsMsg` with the selected issue's ID, which the host answers.
 - The status bar offers `a sessions` and `q back` instead of `q quit`.
+
+Standalone, the sessions key starts vineyard instead, when `main.go` finds it on
+`PATH` and passes it to `Model.WithVineyard`. The root model hands the terminal to
+`vineyard --issue <id>`, run from the `.grapes` directory's parent, with
+`tea.ExecProcess`, and resumes when vineyard quits. Vineyard gets grapes' standard
+streams rather than the `/dev/tty` files Grapes draws on, because tmux, which
+vineyard attaches with, refuses those. A failure shows vineyard's last stderr line
+in the status bar, for example when another vineyard holds the repository's lock.
+Grapes runs no agents itself. Without vineyard, the key does nothing and is not
+offered.
 
 A host also reads issues without showing the screen. `RenderIssue` returns an
 issue as the detail screen draws it, at a width the host chooses, for a pane of the

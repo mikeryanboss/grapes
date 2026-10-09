@@ -1,0 +1,6 @@
+title = 'Start vineyard sessions from standalone grapes'
+status = 'done'
+priority = 'high'
+labels = ['tui', 'vineyard']
+created = 2026-10-09T09:47:00Z
+updated = 2026-10-09T09:52:00Z

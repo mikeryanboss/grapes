@@ -56,9 +56,12 @@ type WriteErrMsg struct{ Err error }
 // embedded Grapes must not return tea.Quit, which would end the host program.
 type CloseMsg struct{}
 
-// SessionsMsg asks the program embedding Grapes for the sessions working on an
-// issue. Standalone Grapes ignores it.
+// SessionsMsg asks for the sessions working on an issue: from the program
+// embedding Grapes, or, standalone, from vineyard.
 type SessionsMsg struct{ IssueID int }
+
+// VineyardFinishedMsg reports that vineyard, started for SessionsMsg, exited.
+type VineyardFinishedMsg struct{ Err error }
 
 // WatchErrMsg reports a file-watcher failure: live reload is degraded.
 type WatchErrMsg struct{ Err error }

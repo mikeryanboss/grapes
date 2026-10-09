@@ -189,6 +189,9 @@ type Model struct {
 	// then emits CloseMsg instead of ending the program, and the status bar
 	// offers the sessions key, which only the host can answer.
 	embedded bool
+	// vineyard is the path of the vineyard binary, or empty. Standalone, the
+	// sessions key then hands the terminal to vineyard at the selected issue.
+	vineyard string
 
 	statusMsg      string // transient error/info message for status bar
 	editingIssueID int    // issue ID for in-progress editor session
@@ -313,12 +316,23 @@ func (m Model) Embedded() Model {
 	return m
 }
 
+// WithVineyard returns the standalone model set up to start vineyard, whose
+// binary is at path, for the sessions key.
+func (m Model) WithVineyard(path string) Model {
+	m.vineyard = path
+	return m
+}
+
 // hostHints returns the status bar hints that end the board, list, and detail
-// screens: quit standalone, sessions and back when embedded.
+// screens: sessions and back when embedded; quit standalone, after sessions
+// when vineyard is installed.
 func (m Model) hostHints() []string {
 	hint, k, gk := m.theme.FormatKeyHint, common.KeyLabel, common.GlobalKeyMap
-	if m.embedded {
+	switch {
+	case m.embedded:
 		return []string{hint(k(gk.Sessions), "sessions"), hint(k(gk.Quit), "back")}
+	case m.vineyard != "":
+		return []string{hint(k(gk.Sessions), "sessions"), hint(k(gk.Quit), "quit")}
 	}
 	return []string{hint(k(gk.Quit), "quit")}
 }
@@ -745,8 +759,19 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Non-tab clicks fall through to active screen delegation
 
 	case common.SessionsMsg:
-		// Only a host program knows about sessions; it handles this message
-		// before forwarding anything to Grapes.
+		// Embedded, the host program knows the sessions and handles this
+		// message before forwarding anything to Grapes. Standalone, vineyard
+		// does, so it gets the terminal until it quits.
+		if m.embedded || m.vineyard == "" {
+			return m, nil
+		}
+		return m, m.runVineyard(msg.IssueID)
+
+	case common.VineyardFinishedMsg:
+		if msg.Err != nil {
+			m.statusMsg = "Vineyard: " + msg.Err.Error()
+			return m, m.clearStatusAfter(5 * time.Second)
+		}
 		return m, nil
 
 	case common.OpenDetailMsg:
@@ -1490,6 +1515,30 @@ func writeFieldCmd(dir string, issueID int, field, value string, children []chil
 }
 
 // clearStatusAfter returns a command that clears the status message after a delay.
+// runVineyard runs vineyard at issue id in the terminal until it quits.
+func (m Model) runVineyard(id int) tea.Cmd {
+	return tea.ExecProcess(m.vineyardCommand(id))
+}
+
+// vineyardCommand returns vineyard at issue id, run from the repository that
+// holds the issues, and the callback reporting its exit. Vineyard gets grapes'
+// standard streams, not the TTY grapes draws on: tmux, which vineyard attaches
+// with, refuses a descriptor opened through /dev/tty.
+func (m Model) vineyardCommand(id int) (*exec.Cmd, tea.ExecCallback) {
+	c := exec.Command(m.vineyard, "--issue", strconv.Itoa(id))
+	c.Dir = filepath.Dir(m.issuesDir)
+	c.Stdin, c.Stdout = os.Stdin, os.Stdout
+	var stderr strings.Builder
+	c.Stderr = &stderr
+	return c, func(err error) tea.Msg {
+		// Vineyard explains a failure in its last line on stderr.
+		if out := strings.TrimSpace(stderr.String()); err != nil && out != "" {
+			err = errors.New(strings.TrimPrefix(out[strings.LastIndex(out, "\n")+1:], "Error: "))
+		}
+		return common.VineyardFinishedMsg{Err: err}
+	}
+}
+
 func (m Model) clearStatusAfter(d time.Duration) tea.Cmd {
 	return tea.Tick(d, func(time.Time) tea.Msg {
 		return clearStatusMsg{}
