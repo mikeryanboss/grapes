@@ -147,14 +147,33 @@ func TestSessionsKeyNamesTheSelectedIssue(t *testing.T) {
 
 func TestIssue(t *testing.T) {
 	r := newRepo(t)
-	r.writeIssue(r.root, 3, "third")
+	r.writeIssue(r.root, 1, "parent")
+	r.writeIssue(r.root, 2, "child")
+	r.writeIssue(r.root, 3, "blocker")
+	meta := filepath.Join(r.root, ".grapes", "2", "meta.toml")
+	f, err := os.OpenFile(meta, os.O_APPEND|os.O_WRONLY, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.WriteString("labels = ['bug', 'tui']\nparent = 1\nblocked_by = [3]\n"); err != nil {
+		t.Fatal(err)
+	}
+	f.Close()
 	r.commit()
 	m := r.load()
 
-	got, ok := m.Issue(3)
-	want := embedded.Issue{ID: 3, Title: "third", Status: "todo"}
-	if !ok || got != want {
-		t.Errorf("Issue(3) = %+v, %v; want %+v", got, ok, want)
+	tests := []struct {
+		id   int
+		want embedded.Issue
+	}{
+		{1, embedded.Issue{ID: 1, Title: "parent", Status: "todo", Children: []int{2}}},
+		{2, embedded.Issue{ID: 2, Title: "child", Status: "todo", Labels: []string{"bug", "tui"}, Parent: 1, BlockedBy: []int{3}}},
+	}
+	for _, tt := range tests {
+		got, ok := m.Issue(tt.id)
+		if !ok || !reflect.DeepEqual(got, tt.want) {
+			t.Errorf("Issue(%d) = %+v, %v; want %+v", tt.id, got, ok, tt.want)
+		}
 	}
 	if _, ok := m.Issue(99); ok {
 		t.Error("Issue(99) found an issue that does not exist")
