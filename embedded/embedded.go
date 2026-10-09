@@ -14,6 +14,7 @@ package embedded
 import (
 	"path/filepath"
 	"runtime/debug"
+	"strings"
 
 	tea "charm.land/bubbletea/v2"
 
@@ -50,21 +51,22 @@ func New(issuesDir string) (Model, error) {
 	return Model{tui: m.Embedded()}, nil
 }
 
-// version returns the Grapes module version the host was built with.
+// version returns the Grapes module version the host was built with, without
+// the module version's "v": the header adds its own, as for release builds.
 func version() string {
 	info, ok := debug.ReadBuildInfo()
 	if !ok {
-		return "(unknown)"
+		return "unknown"
 	}
 	for _, dep := range info.Deps {
 		if dep.Path == "github.com/Mibokess/grapes" {
 			if dep.Replace != nil {
-				return dep.Replace.Version
+				dep = dep.Replace
 			}
-			return dep.Version
+			return strings.TrimPrefix(dep.Version, "v")
 		}
 	}
-	return "(devel)"
+	return "devel"
 }
 
 // Init starts Grapes' file watcher and periodic reload.

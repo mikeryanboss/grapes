@@ -9,3 +9,6 @@
 
 ### 2026-10-09T00:57
 [DONE] Removed `internal/tmux/` and its TUI wiring (reverting the TUI files of `7e93819`). Added `tui.Load`, `Model.Embedded`, the sessions key, `common.CloseMsg`/`SessionsMsg`, and the public `embedded` package. Docs describe embedding; version bumped to 0.1.11 so merging releases it.
+
+### 2026-10-09T01:40
+[VERIFY] Running embedded inside vineyard showed the header as `grapes vv0.1.11-…`: the header adds "v" and the module version carries one. `embedded` now strips it; the vineyard run after the fix shows `grapes v0.1.11-…`. PASS.
