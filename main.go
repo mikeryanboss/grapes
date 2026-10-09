@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 
@@ -14,7 +15,7 @@ import (
 	"github.com/Mibokess/grapes/internal/tui"
 )
 
-var version = "0.1.12"
+var version = "0.1.13"
 
 func main() {
 	// Handle help/version, validate command arguments, and reject unknown
@@ -90,6 +91,9 @@ func main() {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error %v\n", err)
 		os.Exit(1)
+	}
+	if vineyard, err := exec.LookPath("vineyard"); err == nil {
+		model = model.WithVineyard(vineyard)
 	}
 	if err := runTUI(model); err != nil {
 		writeProgramError(os.Stderr, err)

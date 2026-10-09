@@ -19,6 +19,8 @@ Agents change issue status by editing a line in a TOML file. No client libraries
 
 The TUI watches the filesystem and updates in real time — when an agent moves an issue to `in_progress`, you see the card slide across the board immediately.
 
+With [vineyard](https://github.com/mikeryanboss/vineyard) installed, `a` on an issue opens vineyard there: it jumps to the agent session working on the issue, or starts one for it. Quitting vineyard returns to Grapes.
+
 ## Install
 
 Download a binary from [GitHub Releases](https://github.com/Mibokess/grapes/releases), or install with Go:
