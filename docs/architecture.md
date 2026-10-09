@@ -127,7 +127,7 @@ they are lost when that branch is deleted.
 - navigation history, global sorting, and filters;
 - picker and filter overlays;
 - configuration and theme state;
-- filesystem watching, external-editor sessions, tmux session discovery and terminal handoffs, writes, and status messages.
+- filesystem watching, external-editor sessions, writes, and status messages.
 
 Screens live in separate packages and implement local navigation and rendering.
 They communicate upward with the types in `internal/tui/common/messages.go`.
@@ -144,11 +144,30 @@ keyboard/mouse/fs event
   -> refreshed child models
 ```
 
-Issue detail can create or reuse a Grapes-managed tmux session for the active issue source. The runtime association lives in tmux session options rather than tracked issue files. Attaching uses Bubble Tea's `tea.ExecProcess`, so tmux owns the real terminal while attached; detaching restores Grapes and schedules a normal workspace refresh.
-
 Cross-view behavior belongs in the root model. Screen-specific selection, layout,
 and rendering belong in the screen package. Shared message types, key maps, and theme
 primitives belong in `internal/tui/common`.
+
+## Embedding
+
+The public package `embedded` lets another Bubble Tea program, such as vineyard, run
+the TUI as one of its screens. `embedded.New` calls `tui.Load`, the same startup path
+as `main.go`, and marks the model embedded with `Model.Embedded`. Everything else
+stays in `internal/`: a package inside this module may import it, and the
+`embedded` API exposes only what a host needs.
+
+An embedded model changes three things:
+
+- The quit key emits `common.CloseMsg` instead of `tea.Quit`, which would end the
+  host. The file watcher keeps running, because the host may show Grapes again.
+- The sessions key (`a`) on the board, list, and detail screens emits
+  `common.SessionsMsg` with the selected issue's ID. A host's agent sessions are the
+  only sessions Grapes knows about; standalone, the root model ignores the message.
+- The status bar offers `a sessions` and `q back` instead of `q quit`.
+
+Commands from an embedded model run in the host program, so their messages, including
+the file watcher's and the periodic reload's, arrive in the host's `Update`. The host
+must forward every message it does not handle, even while Grapes is hidden.
 
 Loading runs in a command, not in `Update`. Keep it there: reading the workspace
 synchronously froze the event loop for the whole load, which is what made grapes

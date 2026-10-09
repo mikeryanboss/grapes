@@ -37,12 +37,12 @@ Help and version also reject trailing arguments.
 | Change validation | `internal/data/validate.go` | add focused data validation tests |
 | Change writes/editor format | `internal/data/writer.go` | writer tests plus `app_refresh_test.go` when routed by TUI |
 | Add a cross-screen action | `tui/common/messages.go`, `tui/app.go` | `app_refresh_test.go` and relevant interaction test |
-| Add issue-linked tmux sessions | `internal/tmux/`, `tui/detail/`, `tui/app.go` | tmux lifecycle tests and detail interaction tests |
 | Change one screen | its package under `internal/tui/` | package interaction tests and golden tests |
 | Change filter semantics | `internal/tui/filter/` | `filter_test.go`, picker/menu tests, then view tests |
 | Change keys | `config.go`, `common/keys.go`, affected view | config and interaction tests |
 | Change themes | `config.go`, `common/theme.go` | config, preset, settings, and golden tests |
 | Change settings | `internal/tui/settings/settings.go` | settings interaction and golden tests |
+| Change what a host program sees | `embedded/embedded.go`, `tui/app.go` | `embedded/embedded_test.go`, `app_embedded_test.go` |
 | Change release version | `main.go` | `go test ./...`; confirm plugin metadata if releasing it too |
 
 ## TUI Testing
@@ -120,6 +120,9 @@ separate from Git attribution.
 The version variable is in `main.go`. A push to `main` that changes that file causes
 `.github/workflows/auto-tag.yml` to create `v<version>` if absent. That tag triggers
 `.github/workflows/release.yml`, which runs GoReleaser.
+
+Programs that import `embedded` pin a released tag, so a change to that package
+reaches them only after a release.
 
 `.goreleaser.yaml` builds static Linux, macOS, and Windows archives for amd64 and
 arm64. Linker flags replace `main.version` with the release tag.

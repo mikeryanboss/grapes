@@ -9,6 +9,9 @@ import (
 type GlobalKeys struct {
 	Quit     key.Binding
 	Settings key.Binding
+	// Sessions asks the host program for the agent sessions working on the
+	// selected issue. It does something only when Grapes is embedded.
+	Sessions key.Binding
 }
 
 var GlobalKeyMap = GlobalKeys{
@@ -19,6 +22,10 @@ var GlobalKeyMap = GlobalKeys{
 	Settings: key.NewBinding(
 		key.WithKeys("C"),
 		key.WithHelp("C", "config"),
+	),
+	Sessions: key.NewBinding(
+		key.WithKeys("a"),
+		key.WithHelp("a", "sessions"),
 	),
 }
 
@@ -201,7 +208,6 @@ type DetailKeys struct {
 	Labels        key.Binding
 	AddComment    key.Binding
 	EditIssue     key.Binding
-	StartSession  key.Binding
 }
 
 var DetailKeyMap = DetailKeys{
@@ -236,10 +242,6 @@ var DetailKeyMap = DetailKeys{
 	EditIssue: key.NewBinding(
 		key.WithKeys("e"),
 		key.WithHelp("e", "edit"),
-	),
-	StartSession: key.NewBinding(
-		key.WithKeys("a"),
-		key.WithHelp("a", "session"),
 	),
 }
 

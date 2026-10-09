@@ -18,7 +18,6 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/Mibokess/grapes/internal/config"
 	"github.com/Mibokess/grapes/internal/data"
-	"github.com/Mibokess/grapes/internal/tmux"
 	"github.com/Mibokess/grapes/internal/tui/board"
 	"github.com/Mibokess/grapes/internal/tui/common"
 	"github.com/Mibokess/grapes/internal/tui/detail"
@@ -37,13 +36,6 @@ type workspacePollMsg struct {
 	Changed bool
 	Err     error
 }
-type tmuxListMsg struct {
-	Sessions []tmux.Session
-	Err      error
-}
-type tmuxPollMsg struct{}
-
-const tmuxPollInterval = 5 * time.Second
 
 const workspacePollInterval = 5 * time.Second
 
@@ -159,19 +151,18 @@ type navEntry struct {
 }
 
 type Model struct {
-	version     string
-	issues      []data.Issue
-	issuesDir   string
-	projectRoot string
-	width       int
-	height      int
-	screen      common.Screen
-	navStack    []navEntry
-	watcher     *fsnotify.Watcher
-	sortMode    data.SortMode
-	sortAsc     bool // ascending order (reversed from default)
-	theme       common.Theme
-	isDark      bool
+	version   string
+	issues    []data.Issue
+	issuesDir string
+	width     int
+	height    int
+	screen    common.Screen
+	navStack  []navEntry
+	watcher   *fsnotify.Watcher
+	sortMode  data.SortMode
+	sortAsc   bool // ascending order (reversed from default)
+	theme     common.Theme
+	isDark    bool
 
 	cfg      config.Config
 	filters  filter.FilterSet
@@ -190,9 +181,13 @@ type Model struct {
 	loading        bool                  // a reload is in flight
 	refreshPending bool                  // a filesystem event arrived during a load
 	pollScheduled  bool                  // one periodic activity probe is outstanding
-	tmuxSessions   []tmux.Session
 
 	worktreeNames []string // sorted worktree names, for consistent color indexing
+
+	// embedded is set when another Bubble Tea program hosts Grapes. Quitting
+	// then emits CloseMsg instead of ending the program, and the status bar
+	// offers the sessions key, which only the host can answer.
+	embedded bool
 
 	statusMsg      string // transient error/info message for status bar
 	editingIssueID int    // issue ID for in-progress editor session
@@ -291,7 +286,6 @@ func NewModel(ws data.Workspace, loader *data.WorkspaceLoader, issuesDir string,
 		statusMsg:      statusMsg,
 		issues:         issues,
 		issuesDir:      issuesDir,
-		projectRoot:    data.FindMainProjectRoot(issuesDir),
 		screen:         screen,
 		sortMode:       sortMode,
 		filters:        filters,
@@ -310,6 +304,57 @@ func NewModel(ws data.Workspace, loader *data.WorkspaceLoader, issuesDir string,
 func (m Model) WithStatus(msg string) Model {
 	m.statusMsg = msg
 	return m
+}
+
+// Embedded returns the model set up to run inside another Bubble Tea program.
+func (m Model) Embedded() Model {
+	m.embedded = true
+	return m
+}
+
+// hostHints returns the status bar hints that end the board, list, and detail
+// screens: quit standalone, sessions and back when embedded.
+func (m Model) hostHints() []string {
+	hint, k, gk := m.theme.FormatKeyHint, common.KeyLabel, common.GlobalKeyMap
+	if m.embedded {
+		return []string{hint(k(gk.Sessions), "sessions"), hint(k(gk.Quit), "back")}
+	}
+	return []string{hint(k(gk.Quit), "quit")}
+}
+
+// Issues returns the loaded issues, each showing its active source.
+func (m Model) Issues() []data.Issue { return m.issues }
+
+// Worktrees returns the worktrees whose branches changed at least one issue.
+func (m Model) Worktrees() []data.WorktreeInfo { return m.worktrees }
+
+// Load reads the configuration and every issue source for issuesDir and
+// returns the model. Startup problems that do not stop Grapes, a broken config
+// or a skipped issue, go to the status bar: the TUI owns the screen once it
+// runs, so a warning printed before would be wiped by the alt-screen switch.
+func Load(issuesDir, version string) (Model, error) {
+	cfg, cfgErr := config.Load(issuesDir)
+	// The loader is handed to the TUI rather than rebuilt per reload: it caches
+	// what each worktree has changed, keyed on that worktree's HEAD.
+	loader := data.NewWorkspaceLoader()
+	ws, err := loader.Load(issuesDir, data.WorkspaceOptions{
+		DefaultBranch: cfg.Sources.DefaultBranch,
+		ExtraDirs:     cfg.Sources.Dirs,
+	})
+	if err != nil {
+		return Model{}, fmt.Errorf("loading issues: %w", err)
+	}
+	problems := ws.Problems
+	m := NewModel(ws, loader, issuesDir, cfg, version)
+	switch {
+	case cfgErr != nil:
+		m = m.WithStatus("Config error (using defaults): " + cfgErr.Error())
+	case len(problems) == 1:
+		m = m.WithStatus("Skipped " + problems[0].Error())
+	case len(problems) > 1:
+		m = m.WithStatus(fmt.Sprintf("Skipped %s (+%d more)", problems[0].Error(), len(problems)-1))
+	}
+	return m, nil
 }
 
 // issueSourceDir returns the .grapes/ directory for the given issue ID.
@@ -515,44 +560,9 @@ func (m Model) pollCmd() tea.Cmd {
 		return workspacePollMsg{Changed: changed, Err: err}
 	})
 }
-func (m Model) listTmuxCmd() tea.Cmd {
-	projectRoot := m.projectRoot
-	return func() tea.Msg {
-		sessions, err := tmux.List(projectRoot)
-		return tmuxListMsg{Sessions: sessions, Err: err}
-	}
-}
-
-func (m Model) tmuxPollCmd() tea.Cmd {
-	return tea.Tick(tmuxPollInterval, func(time.Time) tea.Msg {
-		return tmuxPollMsg{}
-	})
-}
-
-func (m Model) startTmuxCmd(issue data.Issue) tea.Cmd {
-	projectRoot := m.projectRoot
-	sourceDir := issue.SourceDir
-	if sourceDir == "" {
-		sourceDir = m.issuesDir
-	}
-	cwd := data.ProjectRoot(sourceDir)
-	return func() tea.Msg {
-		session, err := tmux.Ensure(projectRoot, issue.ID, issue.Worktree, cwd)
-		if err != nil {
-			return common.TmuxFinishedMsg{Err: err}
-		}
-		return common.AttachTmuxMsg{IssueID: issue.ID, Target: session.Target}
-	}
-}
-
-func (m Model) attachTmuxCmd(target string) tea.Cmd {
-	return tea.ExecProcess(tmux.AttachCommand(target), func(err error) tea.Msg {
-		return common.TmuxFinishedMsg{Err: err}
-	})
-}
 
 func (m Model) Init() tea.Cmd {
-	return tea.Batch(m.board.Init(), m.list.Init(), m.watchCmd(), m.pollCmd(), m.listTmuxCmd(), m.tmuxPollCmd(), tea.RequestBackgroundColor)
+	return tea.Batch(m.board.Init(), m.list.Init(), m.watchCmd(), m.pollCmd(), tea.RequestBackgroundColor)
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -615,6 +625,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			break // fall through to screen-specific handler
 		}
 		if key.Matches(msg, common.GlobalKeyMap.Quit) {
+			if m.embedded {
+				// The host may show Grapes again, so the watcher keeps running.
+				return m, func() tea.Msg { return common.CloseMsg{} }
+			}
 			if m.watcher != nil {
 				m.watcher.Close()
 			}
@@ -713,6 +727,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		// Non-tab clicks fall through to active screen delegation
 
+	case common.SessionsMsg:
+		// Only a host program knows about sessions; it handles this message
+		// before forwarding anything to Grapes.
+		return m, nil
+
 	case common.OpenDetailMsg:
 		var iss *data.Issue
 		for i := range m.issues {
@@ -724,10 +743,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if iss != nil {
 			m.navStack = append(m.navStack, navEntry{screen: m.screen, detail: m.detail})
 			m.screen = common.ScreenDetail
-			m.detail = detail.New(*iss, m.issues, m.width, m.contentHeight(), m.theme).SetTopOffset(m.topOffset()).SetWorktreeNames(m.worktreeNames).SetTmuxSessions(m.tmuxSessions)
+			m.detail = detail.New(*iss, m.issues, m.width, m.contentHeight(), m.theme).SetTopOffset(m.topOffset()).SetWorktreeNames(m.worktreeNames)
 			return m, m.detail.Init()
 		}
 		return m, nil
+
 	case common.SwitchSourceMsg:
 		for i := range m.issues {
 			if m.issues[i].ID == msg.IssueID {
@@ -737,7 +757,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.board = m.board.SetIssues(filtered)
 				m.list = m.list.SetIssues(filtered)
 				if m.screen == common.ScreenDetail {
-					m.detail = detail.New(m.issues[i], m.issues, m.width, m.contentHeight(), m.theme).SetTopOffset(m.topOffset()).SetWorktreeNames(m.worktreeNames).SetTmuxSessions(m.tmuxSessions)
+					m.detail = detail.New(m.issues[i], m.issues, m.width, m.contentHeight(), m.theme).SetTopOffset(m.topOffset()).SetWorktreeNames(m.worktreeNames)
 				}
 				break
 			}
@@ -840,42 +860,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.list = m.list.SetSortState(m.sortMode, m.sortAsc).SetIssues(filtered)
 		return m, nil
 
-	case tmuxPollMsg:
-		return m, tea.Batch(m.listTmuxCmd(), m.tmuxPollCmd())
-
-	case tmuxListMsg:
-		if msg.Err == nil {
-			m.tmuxSessions = msg.Sessions
-			m.detail = m.detail.SetTmuxSessions(m.tmuxSessions)
-		}
-		return m, nil
-
-	case common.StartTmuxMsg:
-		var issue *data.Issue
-		for i := range m.issues {
-			if m.issues[i].ID == msg.IssueID {
-				issue = &m.issues[i]
-				break
-			}
-		}
-		if issue == nil {
-			return m, nil
-		}
-		return m, m.startTmuxCmd(*issue)
-
-	case common.AttachTmuxMsg:
-		if msg.Target == "" {
-			return m, nil
-		}
-		return m, m.attachTmuxCmd(msg.Target)
-
-	case common.TmuxFinishedMsg:
-		if msg.Err != nil {
-			m.statusMsg = "Tmux error: " + msg.Err.Error()
-			return m, tea.Batch(func() tea.Msg { return common.RefreshMsg{} }, m.listTmuxCmd(), m.clearStatusAfter(3*time.Second))
-		}
-		return m, tea.Batch(func() tea.Msg { return common.RefreshMsg{} }, m.listTmuxCmd())
-
 	case workspacePollMsg:
 		m.pollScheduled = false
 		if msg.Err != nil {
@@ -936,7 +920,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				found := false
 				for _, iss := range issues {
 					if iss.ID == m.detail.IssueID() {
-						m.detail = m.detail.UpdateIssue(iss, m.issues).SetWorktreeNames(wtNames).SetTmuxSessions(m.tmuxSessions)
+						m.detail = m.detail.UpdateIssue(iss, m.issues).SetWorktreeNames(wtNames)
 						found = true
 						break
 					}
@@ -1336,8 +1320,8 @@ func (m Model) View() tea.View {
 			hint(k(bk.ToggleEmpty), "empty cols"),
 			hint(k(bk.ToList), "list"),
 			hint(k(gk.Settings), "config"),
-			hint(k(gk.Quit), "quit"),
 		}
+		helpParts = append(helpParts, m.hostHints()...)
 	case common.ScreenList:
 		content = m.list.View()
 		navHint := k(lk.Down) + k(lk.Up)
@@ -1356,8 +1340,8 @@ func (m Model) View() tea.View {
 			hint(k(lk.Filter), "search"),
 			hint(k(lk.ToBoard), "board"),
 			hint(k(gk.Settings), "config"),
-			hint(k(gk.Quit), "quit"),
 		}
+		helpParts = append(helpParts, m.hostHints()...)
 	case common.ScreenDetail:
 		content = m.detail.View()
 		helpParts = []string{
@@ -1367,11 +1351,10 @@ func (m Model) View() tea.View {
 			hint(k(dk.CyclePriority), "priority"),
 			hint(k(dk.Labels), "labels"),
 			hint(k(dk.AddComment), "comment"),
-			hint(k(dk.StartSession), "session"),
 			hint(k(dk.Back)+"/⌫", "back"),
 			hint(k(gk.Settings), "config"),
-			hint(k(gk.Quit), "quit"),
 		}
+		helpParts = append(helpParts, m.hostHints()...)
 	case common.ScreenSettings:
 		content = m.settings.View()
 		if m.settings.PickerActive() {

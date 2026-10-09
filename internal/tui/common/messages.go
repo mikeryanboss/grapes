@@ -49,16 +49,16 @@ type LabelPickerCancelMsg struct{}
 type LaunchEditorMsg struct{ ID int }
 type EditorFinishedMsg struct{ Err error }
 type LaunchEditMsg struct{ ID int }
-
-// Messages for tmux session lifecycle operations.
-type StartTmuxMsg struct{ IssueID int }
-type AttachTmuxMsg struct {
-	IssueID int
-	Target  string
-}
-type TmuxFinishedMsg struct{ Err error }
 type EditFinishedMsg struct{ Err error }
 type WriteErrMsg struct{ Err error }
+
+// CloseMsg tells the program embedding Grapes that the user pressed quit. An
+// embedded Grapes must not return tea.Quit, which would end the host program.
+type CloseMsg struct{}
+
+// SessionsMsg asks the program embedding Grapes for the sessions working on an
+// issue. Standalone Grapes ignores it.
+type SessionsMsg struct{ IssueID int }
 
 // WatchErrMsg reports a file-watcher failure: live reload is degraded.
 type WatchErrMsg struct{ Err error }

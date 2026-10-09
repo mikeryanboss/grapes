@@ -173,6 +173,14 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 					return m, func() tea.Msg { return common.OpenDetailMsg{ID: id} }
 				}
 			}
+		case key.Matches(msg, common.GlobalKeyMap.Sessions):
+			if row := m.table.SelectedRow(); row != nil {
+				id := 0
+				fmt.Sscanf(row[0], "%d", &id)
+				if id > 0 {
+					return m, func() tea.Msg { return common.SessionsMsg{IssueID: id} }
+				}
+			}
 		case key.Matches(msg, common.ListKeyMap.EditIssue):
 			if row := m.table.SelectedRow(); row != nil {
 				id := 0

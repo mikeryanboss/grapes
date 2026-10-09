@@ -57,12 +57,14 @@ The CLI subcommands (`issue`, `validate`, `help`, and `version`) also enter thro
 | Filters | `internal/tui/filter/` | filter unit tests |
 | Settings, keys, or themes | `internal/tui/settings/`, `internal/tui/common/` | `internal/config/config.go` |
 | Agent workflows | `plugin/skills/grapes/`, `.agents/skills/` | the selected skill only |
+| Hosting Grapes in another program | `embedded/embedded.go` | the Embedding section of `architecture.md` |
 | Release behavior | `.github/workflows/`, `.goreleaser.yaml` | version declaration in `main.go` |
 
 ## Repository Map
 
 ```text
 main.go                  CLI dispatch and TUI bootstrap
+embedded/                public API for running the TUI inside another program
 internal/config/         config schema, defaults, load, save
 internal/data/           issue model, discovery, loading, writing, validation
 internal/tui/app.go      root Bubble Tea model and cross-view coordination
