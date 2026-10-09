@@ -186,3 +186,33 @@ func TestTouchedIssues(t *testing.T) {
 		t.Errorf("TouchedIssues(main checkout) = %v, want none", got)
 	}
 }
+
+// A host shows an issue next to the session working on it, so RenderIssue
+// must show that session's worktree copy, not whichever copy is newest.
+func TestRenderIssueShowsTheWorktreeCopy(t *testing.T) {
+	r := newRepo(t)
+	r.writeIssue(r.root, 3, "three")
+	r.commit()
+	a := filepath.Join(t.TempDir(), "a")
+	b := filepath.Join(t.TempDir(), "b")
+	r.git(r.root, "worktree", "add", "-q", "-b", "a", a)
+	r.git(r.root, "worktree", "add", "-q", "-b", "b", b)
+	r.writeIssue(a, 3, "three in a")
+	r.writeIssue(b, 3, "three in b")
+
+	m := r.load()
+
+	for path, want := range map[string]string{a: "three in a", b: "three in b"} {
+		got, ok := m.RenderIssue(3, path, 80)
+		if !ok || !strings.Contains(got, want) {
+			t.Errorf("RenderIssue(3, %s) = %v, want the copy titled %q:\n%s", filepath.Base(path), ok, want, got)
+		}
+	}
+	shown, _ := m.Issue(3)
+	if got, _ := m.RenderIssue(3, r.root, 80); !strings.Contains(got, shown.Title) {
+		t.Errorf("a checkout without its own copy should show the active copy %q:\n%s", shown.Title, got)
+	}
+	if _, ok := m.RenderIssue(99, a, 80); ok {
+		t.Error("RenderIssue(99) rendered an issue that does not exist")
+	}
+}
